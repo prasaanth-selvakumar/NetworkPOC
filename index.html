@@ -18,37 +18,67 @@ text {
 }
 
 </style>
-<svg width="960" height="600"></svg>
+
 <script src="https://d3js.org/d3.v4.min.js"></script>
+<link href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" rel="Stylesheet"></link>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js" ></script>
+<link href = "https://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css"  rel = "stylesheet">
+<body>
+<div  style="display: flex;flex-direction:column">
+<div>
+
+        <input id="search" type="text">
+<div>
+<div>
+        <button type="button" onclick="searchNode()">Search</button>
+        <button type="button" onclick="reset_view()">Reset Everything</button>
+        <button type="button" onclick="reset_zoom()">Reset Zoom</button>
+</div>
+<div id="dataviz_basicZoom" style="overflow:hidden">
+<svg width="960" height="600"></svg></div>
+</div>
+
 <script>
+
 
 var svg = d3.select("svg"),
     width = +svg.attr("width"),
     height = +svg.attr("height");
 
 var color = d3.scaleOrdinal(d3.schemeCategory20);
-
+var node;
+var link;
+var graph;
+var zoom;
+var gElem;
 var simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", d3.forceManyBody())
     .force("center", d3.forceCenter(width / 2, height / 2));
+data=$.get("http://localhost:3450/data",function(data,status) {
+console.log(data)
+//json_encode(data);
+  //graph=JSON.parse(data)
+//});
+//d3.json("miserables.json", function(error, graph) {
+  //if (error) throw error;
 
-d3.json("miserables.json", function(error, graph) {
-  if (error) throw error;
-
-  var link = svg.append("g")
+ graph=data;
+  //var graph=JSON.parse(data)
+  link = svg.append("g")
       .attr("class", "links")
     .selectAll("line")
     .data(graph.links)
     .enter().append("line")
       .attr("stroke-width", function(d) { return Math.sqrt(d.value); });
 
-  var node = svg.append("g")
+  node = svg.append("g")
       .attr("class", "nodes")
     .selectAll("g")
     .data(graph.nodes)
     .enter().append("g")
-    
+
   var circles = node.append("circle")
       .attr("r", 5)
       .attr("fill", function(d) { return color(d.group); })
@@ -86,8 +116,90 @@ d3.json("miserables.json", function(error, graph) {
           return "translate(" + d.x + "," + d.y + ")";
         })
   }
-});
 
+  $( function() {
+    //console.log(graph.nodes["id"]);
+    var source=[];
+    for (val in graph.nodes){
+      //console.log(graph.nodes[val]["id"])
+      source.push(graph.nodes[val]["id"])
+    }
+    $("#search").autocomplete({
+      minLength:2,
+      maxHeight:100,
+      forceFixPosition:false,
+      showNoSuggestionNotice:true,
+      noSuggestionNotice:"No results Found",
+      source: function (request, response) {
+            var term = $.ui.autocomplete.escapeRegex(request.term)
+                , startsWithMatcher = new RegExp("^" + term, "i")
+                , startsWith = $.grep(source, function(value) {
+                    return startsWithMatcher.test(value.label || value.value || value);
+                })
+                , containsMatcher = new RegExp(term, "i")
+                , contains = $.grep(source, function (value) {
+                    return $.inArray(value, startsWith) < 0 &&
+                        containsMatcher.test(value.label || value.value || value);
+                });
+
+            response(startsWith.concat(contains));
+        }
+    })
+  });
+
+  //zoom = d3.zoom().on("zoom", zoomed);
+  //zoom = d3.behavior.zoom().scaleExtent([0.8,2]).on("zoom", redraw);
+  //gElem=svg.append("g").call(zoom);
+  function zoomed() {
+    gElem.attr("transform", d3.event.transform)
+  }
+  var dims = {
+          width: width,
+          height: height,
+          svg_dx: 50,
+          svg_dy: 50
+      };
+  svg.call(d3.zoom().scaleExtent([.8,3])
+  .on("zoom", function () {
+         svg.attr("transform", d3.event.transform)
+      }));
+
+
+   });
+
+
+   function searchNode() {
+          //find the node
+          var selectedVal = document.getElementById('search').value;
+          //node = svg.selectAll(".node");
+          console.log(selectedVal)
+          //console.log(node)
+          if (selectedVal == "none" || selectedVal == "") {
+              node.style("stroke", "white").style("stroke-width", "1");
+              console.log("in here")
+          } else {
+              var notselected = node.filter(function (d, i) {
+                  return d.id != selectedVal;
+              });
+              var selected = node.filter(function (d, i) {
+                  return d.id == selectedVal;
+              });
+              selectedNode=selected.datum();
+                            //console.log(selected)
+              notselected.style("opacity", "0.2");
+              selected.style("opacity","1");
+              //var link = svg.selectAll(".link")
+              link.style("opacity", "0.2");
+              d3.selectAll(".node, .link").transition()
+                  .duration(1000)
+                  .style("opacity", 1);
+                  var desiredPosition = { x: 400, y: 200 }; // constants, set to svg center point
+                  svg.attr("transform", "translate("+(desiredPosition.x - selectedNode.x)+","+(desiredPosition.y - selectedNode.y)+") scale("+3+")");
+                  console.log("zoomed");
+
+
+          }
+      }
 function dragstarted(d) {
   if (!d3.event.active) simulation.alphaTarget(0.3).restart();
   d.fx = d.x;
@@ -104,5 +216,21 @@ function dragended(d) {
   d.fx = null;
   d.fy = null;
 }
+function reset_view(){
+  node.style("opacity",1)
+  .style("stroke", "white").style("stroke-width", "0");
+  link.style("opacity", "1");
+
+}
+function reset_zoom(){
+  console.log("Trying to zoom out")
+  //d3.transition().duration(10).call(zoom.transform, d3.zoomIdentity);
+  //var zoom =d3.behaviour.zoom().translate([100,50]).scale(2);
+  svg.attr("transform","translate(100,50) scale(1)");
+}
+
+//console.log(graph.nodes);
+
 
 </script>
+</body>
