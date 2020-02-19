@@ -18,3 +18,14 @@
 		      toggle = 0;
 	      }
       })
+### Add at the begining.
+  var linkedByIndex = {};
+  graph.links.forEach(function(d) {
+	  linkedByIndex[d.source + ',' + d.target] = 1;
+	  linkedByIndex[d.target + ',' + d.source] = 1;
+  });
+
+  // A function to test if two nodes are neighboring.
+  function neighboring(a, b) {
+	  return linkedByIndex[a.index + ',' + b.index];
+  }
